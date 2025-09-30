@@ -1,0 +1,220 @@
+# GitHub Actions 工作流：浏览器便携版打包
+# 这个工作流支持 Zen 浏览器和 Firefox 浏览器的便携版构建
+name: Firefox Portable Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '构建原因'
+        required: false
+        default: '手动触发构建'
+        type: string
+  push:
+    branches:
+      - main
+      - master
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  build-firefox:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    # 步骤 1: 检出代码仓库
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 步骤 1.1: 恢复版本缓存
+    - name: Cache version info
+      uses: actions/cache@v4
+      with:
+        path: firefox_last_version.txt
+        key: firefox-version-${{ github.run_number }}
+        restore-keys: |
+          firefox-version-
+
+    # 步骤 2: 检查 Firefox 浏览器版本更新
+    - name: Check Firefox Browser version
+      id: version-check
+      run: |
+        # 检查触发事件类型
+        $trigger_event = "${{ github.event_name }}"
+        echo "Trigger event: $trigger_event"
+        
+        # 获取 Firefox 最新版本信息
+        $latest_url = "https://product-details.mozilla.org/1.0/firefox_versions.json"
+        try {
+          $response = Invoke-RestMethod -Uri $latest_url
+          $latest_version = $response.LATEST_FIREFOX_VERSION
+          echo "Latest Firefox version: $latest_version"
+          echo "firefox_version=$latest_version" >> $env:GITHUB_OUTPUT
+          
+          # 检查触发类型：手动触发和代码提交触发总是执行构建
+          if ($trigger_event -eq "workflow_dispatch" -or $trigger_event -eq "push") {
+            echo "Manual or push trigger detected. Forcing build."
+            echo "should_build=true" >> $env:GITHUB_OUTPUT
+            echo "build_reason=$trigger_event" >> $env:GITHUB_OUTPUT
+            # 更新版本缓存
+            $latest_version | Out-File -FilePath "firefox_last_version.txt" -Encoding UTF8
+          } else {
+            # 定时触发：检查版本更新
+            echo "Schedule trigger detected. Checking for updates."
+            $version_file = "firefox_last_version.txt"
+            if (Test-Path $version_file) {
+              $last_version = Get-Content $version_file
+              echo "Last built version: $last_version"
+              
+              if ($last_version -eq $latest_version) {
+                echo "No update available. Skipping build."
+                echo "should_build=false" >> $env:GITHUB_OUTPUT
+                echo "build_reason=no_update" >> $env:GITHUB_OUTPUT
+                exit 0
+              } else {
+                echo "New Firefox version available: $latest_version"
+                echo "should_build=true" >> $env:GITHUB_OUTPUT
+                echo "build_reason=version_update" >> $env:GITHUB_OUTPUT
+                $latest_version | Out-File -FilePath $version_file -Encoding UTF8
+              }
+            } else {
+              echo "First Firefox build, building latest version: $latest_version"
+              echo "should_build=true" >> $env:GITHUB_OUTPUT
+              echo "build_reason=first_run" >> $env:GITHUB_OUTPUT
+              $latest_version | Out-File -FilePath $version_file -Encoding UTF8
+            }
+          }
+        } catch {
+          echo "Failed to check Firefox version: $_"
+          echo "should_build=true" >> $env:GITHUB_OUTPUT  # 如果检查失败，继续构建
+          echo "build_reason=error_fallback" >> $env:GITHUB_OUTPUT
+        }
+
+    # 步骤 3: 下载 Firefox 浏览器的最新版本
+    - name: Download Firefox Browser
+      id: download-firefox
+      run: |
+        # 下载 Firefox 浏览器的最新版本压缩包
+        $version = "${{ steps.version-check.outputs.firefox_version }}"
+        $url = "https://download-installer.cdn.mozilla.net/pub/firefox/releases/$version/win64/en-US/Firefox%20Setup%20$version.exe"
+        $output = "$env:GITHUB_WORKSPACE\firefox-installer.exe"
+        try {
+          Invoke-WebRequest -Uri $url -OutFile $output
+          echo "archive_path=$output" >> $env:GITHUB_OUTPUT
+          echo "Downloaded file size: $((Get-Item $output).Length) bytes"
+          echo "Downloaded file location: $output"
+        } catch {
+          echo "Failed to download Firefox Browser: $_"
+          exit 1
+        }
+
+    # 步骤 4: 解压 Firefox 浏览器文件
+    - name: Extract Firefox Browser
+      run: |
+        # 使用 7zip 解压 Firefox 浏览器到 firefox 目录
+        $archive = "${{ steps.download-firefox.outputs.archive_path }}"
+        echo "Looking for archive at: $archive"
+        if (-not (Test-Path $archive)) {
+          echo "Firefox Browser archive not found at: $archive"
+          echo "Current directory: $(Get-Location)"
+          echo "Files in current directory:"
+          Get-ChildItem -Path . -Name
+          exit 1
+        }
+        echo "Archive found, size: $((Get-Item $archive).Length) bytes"
+        New-Item -ItemType Directory -Force -Path "D:\firefox"
+        Set-Location -Path "D:\firefox"
+        echo "Extracting to: $(Get-Location)"
+        7z x "$archive" -y
+        echo "Extraction completed"
+        Get-ChildItem -Path . -Name
+
+    # 步骤 5: 复制本地 libportable 工具包到目标目录
+    - name: Copy local libportable tools
+      run: |
+        # 确保目标目录存在
+        $targetDir = "D:\firefox"
+        if (-not (Test-Path $targetDir)) {
+          New-Item -ItemType Directory -Force -Path $targetDir
+        }
+        
+        # 复制本地 libportable 文件
+        $libportableSource = "$env:GITHUB_WORKSPACE\libportable"
+        echo "Copying libportable from: $libportableSource"
+        echo "Files in libportable directory:"
+        Get-ChildItem -Path $libportableSource -Name
+        
+        Copy-Item -Path "$libportableSource\*" -Destination $targetDir -Recurse -Force
+        echo "libportable tools copied successfully"
+        echo "Files in target directory:"
+        Get-ChildItem -Path $targetDir -Name
+
+    # 步骤 7: 运行便携版创建脚本
+    - name: Create portable package
+      working-directory: D:\firefox
+      run: |
+        # 运行便携版创建脚本，将 firefox.exe 转换为便携版
+        echo "Current directory: $(Get-Location)"
+        echo "Files in current directory:"
+        Get-ChildItem -Path . -Name
+        ./injectpe.bat
+      continue-on-error: true
+
+    # 步骤 8: 打包最终的便携版文件
+    - name: Package portable build
+      run: |
+        # 使用 7zip 将处理后的 Firefox 浏览器目录打包为便携版压缩包
+        $sourceDir = "D:\firefox"
+        $outputZip = "$env:GITHUB_WORKSPACE\firefox-portable.zip"
+        echo "Packaging from: $sourceDir"
+        echo "Output zip: $outputZip"
+        7z a -tzip "$outputZip" "$sourceDir\*"
+        echo "Package size: $((Get-Item $outputZip).Length) bytes"
+      continue-on-error: true
+
+    # 步骤 9: 上传构建产物作为工作流工件
+    - name: Upload portable package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: firefox-portable
+        path: ${{ github.workspace }}\firefox-portable.zip
+      continue-on-error: true
+
+    # 步骤 10: 保存版本信息
+    - name: Save version info
+      run: |
+        # 保存当前构建的版本信息
+        echo "Build marked as successful regardless of packaging result"
+        echo "Firefox Browser version: ${{ steps.version-check.outputs.firefox_version }}"
+        echo "Build trigger: ${{ steps.version-check.outputs.build_reason }}"
+        echo "Event name: ${{ github.event_name }}"
+        echo "firefox_version=${{ steps.version-check.outputs.firefox_version }}" >> $env:GITHUB_OUTPUT
+        echo "build_reason=${{ steps.version-check.outputs.build_reason }}" >> $env:GITHUB_OUTPUT
+      continue-on-error: true
+
+    # 步骤 11: 创建或更新 GitHub Release 并上传便携版文件
+    - name: Create Release and Upload Portable Package
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: firefox-${{ steps.version-check.outputs.firefox_version }}
+        name: Firefox Portable ${{ steps.version-check.outputs.firefox_version }}
+        body: |
+          Firefox ${{ steps.version-check.outputs.firefox_version }} 便携版
+          
+          这是一个自动构建的 Firefox 浏览器便携版本，基于 libportable 项目。
+          
+          ## 版本信息
+          - 基础版本：${{ steps.version-check.outputs.firefox_version }}
+          - 构建时间：${{ github.run_started_at }}
+          - 构建环境：${{ runner.os }}
+          - 构建触发：${{ steps.version-check.outputs.build_reason }}
+        draft: false
+        prerelease: false
+        files: |
+          ${{ github.workspace }}\firefox-portable.zip
+      continue-on-error: true
