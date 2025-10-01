@@ -54,7 +54,11 @@ jobs:
           # 手动触发和代码提交触发总是执行构建
           if ($trigger_event -eq "workflow_dispatch" -or $trigger_event -eq "push") {
             echo "should_build=true" >> $env:GITHUB_OUTPUT
-            echo "build_reason=$trigger_event" >> $env:GITHUB_OUTPUT
+            if ($trigger_event -eq "workflow_dispatch") {
+              echo "build_reason=手动触发构建" >> $env:GITHUB_OUTPUT
+            } else {
+              echo "build_reason=代码提交触发" >> $env:GITHUB_OUTPUT
+            }
             $latest_version | Out-File -FilePath "firefox_last_version.txt" -Encoding UTF8
           } else {
             # 定时触发：检查版本更新
@@ -63,22 +67,22 @@ jobs:
               $last_version = Get-Content $version_file
               if ($last_version -eq $latest_version) {
                 echo "should_build=false" >> $env:GITHUB_OUTPUT
-                echo "build_reason=no_update" >> $env:GITHUB_OUTPUT
+                echo "build_reason=无需更新" >> $env:GITHUB_OUTPUT
                 exit 0
               } else {
                 echo "should_build=true" >> $env:GITHUB_OUTPUT
-                echo "build_reason=version_update" >> $env:GITHUB_OUTPUT
+                echo "build_reason=自动更新构建" >> $env:GITHUB_OUTPUT
                 $latest_version | Out-File -FilePath $version_file -Encoding UTF8
               }
             } else {
               echo "should_build=true" >> $env:GITHUB_OUTPUT
-              echo "build_reason=first_run" >> $env:GITHUB_OUTPUT
+              echo "build_reason=首次构建" >> $env:GITHUB_OUTPUT
               $latest_version | Out-File -FilePath $version_file -Encoding UTF8
             }
           }
         } catch {
           echo "should_build=true" >> $env:GITHUB_OUTPUT
-          echo "build_reason=error_fallback" >> $env:GITHUB_OUTPUT
+          echo "build_reason=错误回退构建" >> $env:GITHUB_OUTPUT
         }
 
     # 步骤 4: 下载 Firefox 浏览器
@@ -122,6 +126,7 @@ jobs:
 
     # 步骤 7: 打包并上传便携版文件
     - name: Package and upload portable build
+      id: package
       run: |
         # 打包便携版文件
         $sourceDir = "D:\firefox"
@@ -149,9 +154,9 @@ jobs:
           
           ## 版本信息
           - 基础版本：${{ steps.version-check.outputs.firefox_version }}
-          - 构建时间：${{ steps.version-check.outputs.build_reason }}
+          - 构建时间：${{ steps.package.outputs.formatted_build_time }}
           - 构建环境：${{ runner.os }}
-          - 构建触发：${{ steps.version-check.outputs.build_reason }}
+          - 构建原因：${{ steps.version-check.outputs.build_reason }}
         draft: false
         prerelease: false
         files: |
