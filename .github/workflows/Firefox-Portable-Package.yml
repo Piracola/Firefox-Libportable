@@ -111,8 +111,8 @@ jobs:
           exit 1
         }
 
-    # 步骤 4: 解压 Firefox 浏览器文件
-    - name: Extract Firefox Browser
+    # 步骤 4: 解压 Firefox 浏览器文件并处理目录结构
+    - name: Extract Firefox Browser and process directory structure
       run: |
         # 使用 7zip 解压 Firefox 浏览器到 firefox 目录
         $archive = "${{ steps.download-firefox.outputs.archive_path }}"
@@ -130,13 +130,38 @@ jobs:
         echo "Extracting to: $(Get-Location)"
         7z x "$archive" -y
         echo "Extraction completed"
+        echo "Files in current directory:"
         Get-ChildItem -Path . -Name
+        
+        # 检查是否存在 core 文件夹
+        $corePath = "D:\firefox\core"
+        if (Test-Path $corePath) {
+          echo "Found core folder, renaming to Firefox"
+          Rename-Item -Path $corePath -NewName "Firefox" -Force
+          echo "Core folder renamed to Firefox successfully"
+        } else {
+          echo "Core folder not found at: $corePath"
+        }
+        
+        # 检查并删除 setup.exe 文件
+        $setupPath = "D:\firefox\setup.exe"
+        if (Test-Path $setupPath) {
+          echo "Found setup.exe, removing it"
+          Remove-Item -Path $setupPath -Force
+          echo "setup.exe removed successfully"
+        } else {
+          echo "setup.exe not found at: $setupPath"
+        }
+        
+        # 显示处理后的文件结构
+        echo "Final directory structure:"
+        Get-ChildItem -Path "D:\firefox" -Recurse | Select-Object FullName
 
     # 步骤 5: 复制本地 libportable 工具包到目标目录
     - name: Copy local libportable tools
       run: |
         # 确保目标目录存在
-        $targetDir = "D:\firefox"
+        $targetDir = "D:\firefox\Firefox"
         if (-not (Test-Path $targetDir)) {
           New-Item -ItemType Directory -Force -Path $targetDir
         }
@@ -154,7 +179,7 @@ jobs:
 
     # 步骤 7: 运行便携版创建脚本
     - name: Create portable package
-      working-directory: D:\firefox
+      working-directory: D:\firefox\Firefox
       run: |
         # 运行便携版创建脚本，将 firefox.exe 转换为便携版
         echo "Current directory: $(Get-Location)"
@@ -216,7 +241,7 @@ jobs:
           
           ## 版本信息
           - 基础版本：${{ steps.version-check.outputs.firefox_version }}
-          - 构建时间：${{ github.run_started_at }}
+          - 构建时间：${{ steps.save-info.outputs.formatted_build_time }}
           - 构建环境：${{ runner.os }}
         draft: false
         prerelease: false
