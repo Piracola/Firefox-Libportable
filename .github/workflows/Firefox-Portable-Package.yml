@@ -183,8 +183,9 @@ jobs:
         path: ${{ github.workspace }}\firefox-portable.zip
       continue-on-error: true
 
-    # 步骤 10: 保存版本信息
-    - name: Save version info
+    # 步骤 10: 保存版本信息和格式化构建时间
+    - name: Save version info and format build time
+      id: save-info
       run: |
         # 保存当前构建的版本信息
         echo "Build marked as successful regardless of packaging result"
@@ -193,6 +194,11 @@ jobs:
         echo "Event name: ${{ github.event_name }}"
         echo "firefox_version=${{ steps.version-check.outputs.firefox_version }}" >> $env:GITHUB_OUTPUT
         echo "build_reason=${{ steps.version-check.outputs.build_reason }}" >> $env:GITHUB_OUTPUT
+        
+        # 格式化构建时间
+        $buildTime = Get-Date -Date "${{ github.run_started_at }}" -Format "yyyy-MM-dd HH:mm:ss"
+        echo "格式化构建时间: $buildTime"
+        echo "formatted_build_time=$buildTime" >> $env:GITHUB_OUTPUT
       continue-on-error: true
 
     # 步骤 11: 创建或更新 GitHub Release 并上传便携版文件
@@ -212,7 +218,6 @@ jobs:
           - 基础版本：${{ steps.version-check.outputs.firefox_version }}
           - 构建时间：${{ github.run_started_at }}
           - 构建环境：${{ runner.os }}
-          - 构建触发：${{ steps.version-check.outputs.build_reason }}
         draft: false
         prerelease: false
         files: |
