@@ -140,7 +140,7 @@ jobs:
       id: package
       run: |
         # 打包便携版文件
-        $sourceDir = "D:\Firefox\*"
+        $sourceDir = "D:\*"
         $outputZip = "$env:GITHUB_WORKSPACE\Firefox.zip"
         7z a -tzip "$outputZip" "$sourceDir"
         
@@ -169,7 +169,7 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ${{ github.workspace }}\firefox-portable.zip
+          ${{ github.workspace }}\Firefox.zip
 
   cleanup:
     if: always()
