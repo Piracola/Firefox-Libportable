@@ -128,7 +128,7 @@ jobs:
         Copy-Item -Path "$libportableSource\*" -Destination $firefoxDir -Recurse -Force
         
         # 复制开始.bat到firefox目录
-        Copy-Item -Path "$env:GITHUB_WORKSPACE\开始.bat" -Destination "D:\firefox" -Force
+        Copy-Item -Path "$env:GITHUB_WORKSPACE\开始.bat" -Destination "D:\" -Force
 
         # 运行便携版创建脚本
         Set-Location -Path $firefoxDir
