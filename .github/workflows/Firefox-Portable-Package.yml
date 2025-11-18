@@ -140,9 +140,9 @@ jobs:
       id: package
       run: |
         # 打包便携版文件
-        $sourceDir = "D:\*"
+        $sourceDir = "D:\firefox\*"
         $outputZip = "$env:GITHUB_WORKSPACE\Firefox.zip"
-        7z a -tzip "$outputZip" "$sourceDir"
+        7z a -tzip "$outputZip" "$sourceDir" "D:\开始.bat"
         
         # 设置发布信息
         $buildTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
