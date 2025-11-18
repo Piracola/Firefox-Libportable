@@ -8,6 +8,7 @@
 3. 运行 "开始.bat" 即可创建快捷方式
 
 ## 更新方式
+仅需替换 Firefox 这个包含浏览器本体的目录即可升级。
 1. 在浏览器根目录中将 Firefox 目录修改为 Firefoxold 以便于回退。
 2. 复制新版本压缩包内的 Firefox 到同目录下。
 
@@ -16,5 +17,4 @@
 - 参考[portable](libportable/portable.ini)文件中的说明对便携化参数进行自定义。
 
 ## 许可证
-
 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
