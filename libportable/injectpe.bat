@@ -1,9 +1,9 @@
 @echo off
 if exist "%~dp0firefox.exe" (echo.) && if exist "%~dp0mozglue.dll" (
-echo    业   要注    募 firefox.exe. 
+echo 已找到需要注入的文件firefox.exe. 
 goto platform
 ) else (
-echo 没 业     募 ,  殉            陌 装目录执  .
+echo 没找到相关文件,请把程序放入浏览器的安装目录执行.
 goto eof
 )
 
@@ -20,7 +20,7 @@ goto eof
 
 :x86
 @echo ***********************************************************************
-@echo *                     远 注  32位  firefox                           *
+@echo *                程序自动注入32位的firefox浏览器                      *
 @echo ***********************************************************************
 echo+
 @pause .
@@ -30,7 +30,7 @@ goto runing
 :x64
 echo+
 @echo ***********************************************************************
-@echo *                     远 注  64位  firefox                           *
+@echo *                程序自动注入64位的firefox浏览器                      *
 @echo ***********************************************************************
 echo+
 @pause .
@@ -38,8 +38,8 @@ if exist "%~dp0upcheck64.exe" rename upcheck64.exe upcheck.exe 2>nul
 
 :runing
 if exist "%~dp0upcheck.exe" upcheck.exe -dll 2>nul
-if "%errorlevel%"=="0" echo 注  晒 ,    细 亩 README  portable(example).ini 募 !&goto eof
-echo     注  失  ,   慰       息,       之前注   .
+if "%errorlevel%"=="0" echo 注入成功,请仔细阅读README和portable(example).ini文件!&goto eof
+echo 程序注入失败, 请参考错误信息, 或许你之前注入过.
 
 :eof
 pause .
