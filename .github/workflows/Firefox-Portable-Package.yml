@@ -93,7 +93,32 @@ jobs:
           echo "build_reason=错误回退构建" >> $env:GITHUB_OUTPUT
         }
 
-    # 步骤 4: 下载并解压 Firefox 浏览器
+    # 步骤 4: 获取 Firefox 发行说明
+    - name: Fetch Firefox Release Notes
+      run: |
+        pip install requests beautifulsoup4
+        python .github/scripts/fetch_release_notes.py "${{ steps.version-check.outputs.firefox_version }}"
+        
+        # 准备发布说明内容
+        $version = "${{ steps.version-check.outputs.firefox_version }}"
+        $bodyFile = "release_body.md"
+        $notesFile = "release_notes_en.md"
+        
+        $content = "Firefox $version 便携版`n"
+        $content += "这是一个自动构建的 Firefox 浏览器便携版本，基于 libportable 项目。`n`n"
+        $content += "使用方法：`n"
+        $content += "1. 下载 [Firefox.zip](https://github.com/Piracola/Firefox-Libportable/releases/latest/download/firefox.zip) 文件`n"
+        $content += "2. 解压到任意目录`n"
+        $content += "3. 运行 开始.bat 即可创建快捷方式`n`n"
+        $content += "---`n`n"
+        
+        Set-Content -Path $bodyFile -Value $content -Encoding UTF8
+        
+        if (Test-Path $notesFile) {
+          Get-Content $notesFile | Add-Content $bodyFile
+        }
+
+    # 步骤 5: 下载并解压 Firefox 浏览器
     - name: Download and Extract Firefox Browser
       run: |
         # 下载并解压 Firefox 浏览器
@@ -117,7 +142,7 @@ jobs:
           Remove-Item -Path "$extractDir\setup.exe" -Force
         }
 
-    # 步骤 5: 创建 Firefox 便携版
+    # 步骤 6: 创建 Firefox 便携版
     - name: Create Firefox Portable Package
       run: |
         # 复制 libportable 工具并创建便携版
@@ -135,7 +160,7 @@ jobs:
         ./injectpe.bat
       continue-on-error: true
 
-    # 步骤 6: 打包并发布便携版
+    # 步骤 7: 打包并发布便携版
     - name: Package and Release Portable Build
       id: package
       run: |
@@ -150,7 +175,7 @@ jobs:
         echo "build_reason=${{ steps.version-check.outputs.build_reason }}" >> $env:GITHUB_OUTPUT
         echo "formatted_build_time=$buildTime" >> $env:GITHUB_OUTPUT
 
-    # 步骤 7: 创建 GitHub Release
+    # 步骤 8: 创建 GitHub Release
     - name: Create Release and Upload Portable Package
       uses: softprops/action-gh-release@v2
       env:
@@ -158,14 +183,7 @@ jobs:
       with:
         tag_name: firefox-${{ steps.package.outputs.firefox_version }}
         name: Firefox Portable ${{ steps.package.outputs.firefox_version }}
-        body: |
-          Firefox ${{ steps.package.outputs.firefox_version }} 便携版
-          这是一个自动构建的 Firefox 浏览器便携版本，基于 libportable 项目。
-
-          使用方法：
-          1. 下载 [Firefox.zip](https://github.com/Piracola/Firefox-Libportable/releases/latest/download/firefox.zip) 文件
-          2. 解压到任意目录
-          3. 运行 开始.bat 即可创建快捷方式
+        body_path: release_body.md
         draft: false
         prerelease: false
         files: |

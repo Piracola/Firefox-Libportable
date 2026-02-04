@@ -1,6 +1,6 @@
 # Firefox-Libportable
 本项目旨在提供一个开箱即用的便携版 Firefox 浏览器。
-基于 libportable 的浏览器便携版自动化打包项目，支持 Firefox 浏览器和 [Zen](https://github.com/Piracola/Zen-Libportable) 浏览器。
+基于 libportable 的浏览器便携版自动化打包项目，支持 Firefox 浏览器和 [Zen](https://github.com/Piracola/Zen-Libportable) 浏览器和 [Floorp](https://github.com/Piracola/Floorp_portable) 浏览器。
 
 ## 使用方式
 1. 下载 [Firefox.zip](https://github.com/Piracola/Firefox-Libportable/releases/latest/download/Firefox.zip) 文件
@@ -10,7 +10,7 @@
 ## 更新方式
 仅需替换 Firefox 这个包含浏览器本体的目录即可升级。
 1. 在浏览器根目录中将 Firefox 目录修改为 Firefoxold 以便于回退。
-2. 复制新版本压缩包内的 Firefox 到同目录下。
+2. 复制新版本压缩包内的 Firefox 文件夹到同目录下。
 
 ## 参数配置
 配置文件目录修改：
