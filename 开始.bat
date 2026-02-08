@@ -1,37 +1,19 @@
 @echo off
-setlocal enabledelayedexpansion
+chcp 65001 >nul
+setlocal
 
-:: ÉèÖÃÄ¿±êÎÄ¼þÂ·¾¶
-set "targetDir=Firefox"
-set "targetExe=firefox.exe"
-set "targetPath=%~dp0%targetDir%\%targetExe%"
+set "target=%~dp0Firefox\firefox.exe"
+set "lnk=%~dp0Firefox.lnk"
 
-:: ¼ì²éÄ¿±êÎÄ¼þÊÇ·ñ´æÔÚ
-if not exist "%targetPath%" (
-    echo ´íÎó: Î´ÕÒµ½ %targetPath%
-    pause
-    exit /b 1
+if not exist "%target%" (
+    echo [é”™è¯¯] æœªæ‰¾åˆ° %target%
+    pause & exit /b 1
 )
 
-:: ÉèÖÃ¿ì½Ý·½Ê½Ãû³ÆºÍÂ·¾¶
-set "shortcutName=Firefox.lnk"
-set "shortcutPath=%~dp0%shortcutName%"
+powershell -NoP -EP Bypass -C "$w=New-Object -ComObject WScript.Shell;$s=$w.CreateShortcut('%lnk%');$s.TargetPath='%target%';$s.WorkingDirectory='%~dp0Firefox';$s.Description='firefoxæµè§ˆå™¨';$s.Save()" 2>nul
 
-:: ´´½¨VBS½Å±¾À´Éú³É¿ì½Ý·½Ê½
-set "vbsScript=%temp%\CreateShortcut.vbs"
+if %errorlevel% neq 0 (
+    echo [é”™è¯¯] åˆ›å»ºå¿«æ·æ–¹å¼å¤±è´¥
+    pause & exit /b 1
+)
 
-echo Set oWS = WScript.CreateObject("WScript.Shell") > "%vbsScript%"
-echo sLinkFile = "%shortcutPath%" >> "%vbsScript%"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%vbsScript%"
-echo oLink.TargetPath = "%targetPath%" >> "%vbsScript%"
-echo oLink.WorkingDirectory = "%~dp0%targetDir%" >> "%vbsScript%"
-echo oLink.Description = "Firefox±ãÐ¯°æ" >> "%vbsScript%"
-echo oLink.Save >> "%vbsScript%"
-
-:: Ö´ÐÐVBS½Å±¾´´½¨¿ì½Ý·½Ê½
-cscript //nologo "%vbsScript%"
-
-:: É¾³ýÁÙÊ±VBS½Å±¾
-del "%vbsScript%"
-
-pause
