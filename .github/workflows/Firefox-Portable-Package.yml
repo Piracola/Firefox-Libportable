@@ -140,7 +140,8 @@ jobs:
         tag_name: ${{ steps.version-check.outputs.firefox_version }}
         name: Firefox Portable ${{ steps.version-check.outputs.firefox_version }}
         body_path: release_body.md
-        files: ${{ steps.build.outputs.artifact_path }}
+        files: |
+          ${{ steps.build.outputs.artifact_path }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
