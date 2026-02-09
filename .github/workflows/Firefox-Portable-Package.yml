@@ -95,90 +95,62 @@ jobs:
 
     # 步骤 4: 准备发布说明
     - name: Prepare Release Notes
+      if: steps.version-check.outputs.should_build == 'true'
       run: |
         $version = "${{ steps.version-check.outputs.firefox_version }}"
         $bodyFile = "release_body.md"
-        
         $content = "Firefox $version 便携版`n"
         $content += "这是一个自动构建的 Firefox 浏览器便携版本，基于 libportable 项目。`n`n"
         $content += "**官方发行说明 / Official Release Notes:** https://www.mozilla.org/en-US/firefox/$version/releasenotes/`n`n"
-        $content += "使用方法：`n"
-        $content += "1. 下载 [Firefox.zip](https://github.com/Piracola/Firefox-Libportable/releases/latest/download/firefox.zip) 文件`n"
-        $content += "2. 解压到任意目录`n"
-        $content += "3. 运行 开始.bat 即可创建快捷方式`n"
-        
         Set-Content -Path $bodyFile -Value $content -Encoding UTF8
 
-    # 步骤 5: 下载并解压 Firefox 浏览器
-    - name: Download and Extract Firefox Browser
+    # 步骤 5: 准备构建环境
+    - name: Checkout Browser-builder
+      if: steps.version-check.outputs.should_build == 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/Browser-builder
+        path: builder
+
+    - name: Set up Python
+      if: steps.version-check.outputs.should_build == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      if: steps.version-check.outputs.should_build == 'true'
       run: |
-        # 下载并解压 Firefox 浏览器
-        $version = "${{ steps.version-check.outputs.firefox_version }}"
-        $url = "https://download-installer.cdn.mozilla.net/pub/firefox/releases/$version/win64/zh-CN/Firefox%20Setup%20$version.exe"
-        $installer = "$env:GITHUB_WORKSPACE\firefox-installer.exe"
-        $extractDir = "D:\firefox"
-        
-        # 下载安装程序
-        Invoke-WebRequest -Uri $url -OutFile $installer
-        
-        # 创建解压目录并解压
-        New-Item -ItemType Directory -Force -Path $extractDir
-        7z x "$installer" -o"$extractDir" -y
-        
-        # 重命名 core 文件夹为 Firefox 并删除 setup.exe
-        if (Test-Path "$extractDir\core") {
-          Rename-Item -Path "$extractDir\core" -NewName "Firefox" -Force
-        }
-        if (Test-Path "$extractDir\setup.exe") {
-          Remove-Item -Path "$extractDir\setup.exe" -Force
-        }
+        pip install -r builder/requirements.txt
 
-    # 步骤 6: 创建 Firefox 便携版
-    - name: Create Firefox Portable Package
+    # 步骤 6: 执行 Python 构建脚本
+    - name: Build Portable Package
+      if: steps.version-check.outputs.should_build == 'true'
+      id: build
       run: |
-        # 复制 libportable 工具并创建便携版
-        $firefoxDir = "D:\firefox\Firefox"
-        $libportableSource = "$env:GITHUB_WORKSPACE\libportable"
-        
-        # 复制所有 libportable 工具文件
-        Copy-Item -Path "$libportableSource\*" -Destination $firefoxDir -Recurse -Force
-        
-        # 复制开始.bat到firefox目录
-        Copy-Item -Path "$env:GITHUB_WORKSPACE\开始.bat" -Destination "D:\" -Force
+        python builder/build.py --browser firefox --version "${{ steps.version-check.outputs.firefox_version }}" --libportable libportable --launcher 开始.bat
 
-        # 运行便携版创建脚本
-        Set-Location -Path $firefoxDir
-        ./injectpe.bat
-      continue-on-error: true
-
-    # 步骤 7: 打包并发布便携版
-    - name: Package and Release Portable Build
-      id: package
-      run: |
-        # 打包便携版文件
-        $sourceDir = "D:\firefox\*"
-        $outputZip = "$env:GITHUB_WORKSPACE\Firefox.zip"
-        7z a -tzip "$outputZip" "$sourceDir" "D:\开始.bat"
-        
-        # 设置发布信息
-        $buildTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        echo "firefox_version=${{ steps.version-check.outputs.firefox_version }}" >> $env:GITHUB_OUTPUT
-        echo "build_reason=${{ steps.version-check.outputs.build_reason }}" >> $env:GITHUB_OUTPUT
-        echo "formatted_build_time=$buildTime" >> $env:GITHUB_OUTPUT
-
-    # 步骤 8: 创建 GitHub Release
-    - name: Create Release and Upload Portable Package
-      uses: softprops/action-gh-release@v2
+    # 步骤 7: 创建 Release
+    - name: Create Release
+      if: steps.version-check.outputs.should_build == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version-check.outputs.firefox_version }}
+        name: Firefox Portable ${{ steps.version-check.outputs.firefox_version }}
+        body_path: release_body.md
+        files: ${{ steps.build.outputs.artifact_path }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: firefox-${{ steps.package.outputs.firefox_version }}
-        name: Firefox Portable ${{ steps.package.outputs.firefox_version }}
-        body_path: release_body.md
-        draft: false
-        prerelease: false
-        files: |
-          ${{ github.workspace }}\Firefox.zip
+
+    # 步骤 8: 提交版本更新
+    - name: Commit version update
+      if: steps.version-check.outputs.should_build == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add firefox_last_version.txt
+        git commit -m "Update Firefox version to ${{ steps.version-check.outputs.firefox_version }}"
+        git push
 
   cleanup:
     if: always()
