@@ -24,7 +24,7 @@
 
 ## ⚙️ 高级配置
 
-配置文件位于 `libportable/portable.ini`，支持自定义数据和缓存路径：
+配置文件位于 `Firefox/portable.ini`：
 
 ```ini
 [Portable]
