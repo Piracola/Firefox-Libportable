@@ -131,6 +131,9 @@ jobs:
         $version = "${{ steps.version-check.outputs.firefox_version }}"
         $url = "https://download-installer.cdn.mozilla.net/pub/firefox/releases/$version/win64/en-US/Firefox%20Setup%20$version.exe"
         python builder/build.py --browser firefox --version "$version" --url "$url" --libportable libportable --launcher 开始.bat
+        $artifactPath = "Firefox_$version.7z"
+        echo "artifact_path=$artifactPath" >> $env:GITHUB_OUTPUT
+        echo "artifact_name=$artifactPath" >> $env:GITHUB_OUTPUT
 
     # 步骤 7: 创建 Release
     - name: Create Release
@@ -141,7 +144,7 @@ jobs:
         name: Firefox Portable ${{ steps.version-check.outputs.firefox_version }}
         body_path: release_body.md
         files: |
-          ${{ steps.build.outputs.artifact_path }}
+          Firefox_${{ steps.version-check.outputs.firefox_version }}.7z
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
