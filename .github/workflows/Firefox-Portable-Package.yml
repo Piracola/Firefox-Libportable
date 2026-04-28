@@ -155,8 +155,15 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add firefox_last_version.txt
-        git commit -m "Update Firefox version to ${{ steps.version-check.outputs.firefox_version }}"
-        git push
+        git diff --cached --quiet
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "No version file changes to commit."
+        } elseif ($LASTEXITCODE -eq 1) {
+          git commit -m "Update Firefox version to ${{ steps.version-check.outputs.firefox_version }}"
+          git push
+        } else {
+          exit $LASTEXITCODE
+        }
 
   cleanup:
     if: always()

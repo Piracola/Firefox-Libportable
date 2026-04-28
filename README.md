@@ -10,7 +10,7 @@
 
 ## 🚀 快速开始
 
-1. **下载**: [📥 下载最新版本](https://github.com/Piracola/Firefox-Libportable/releases/latest/download/Firefox.zip)
+1. **下载**: [📥 下载最新版本](https://github.com/Piracola/Firefox-Libportable/releases/latest)
 2. **解压**: 将压缩包解压到任意目录（如 `D:\Browser\Firefox`）。
 3. **运行**: 双击 `开始.bat`，脚本将自动创建快捷方式。
 
@@ -34,10 +34,14 @@ CachePath=..\Cache
 
 ## 🔗 相关项目
 
-| 浏览器 | 项目地址 | 状态 |
-|--------|----------|------|
-| Zen | [Zen-Libportable](https://github.com/Piracola/Zen-Libportable) | ✅ Available |
-| Floorp | [Floorp_portable](https://github.com/Piracola/Floorp_portable) | ✅ Available |
+本仓库通过 GitHub Actions 检出并调用主构建仓库 [Browser-builder](https://github.com/Piracola/Browser-builder) 中的通用脚本。
+
+| 项目 | 说明 | 地址 |
+|------|------|------|
+| Browser-builder | 通用构建脚本 | [Piracola/Browser-builder](https://github.com/Piracola/Browser-builder) |
+| Firefox-Libportable | Firefox 便携版（当前项目） | [Piracola/Firefox-Libportable](https://github.com/Piracola/Firefox-Libportable) |
+| Floorp_portable | Floorp 便携版 | [Piracola/Floorp_portable](https://github.com/Piracola/Floorp_portable) |
+| Zen-Libportable | Zen 便携版 | [Piracola/Zen-Libportable](https://github.com/Piracola/Zen-Libportable) |
 
 ## 📄 许可证
 
