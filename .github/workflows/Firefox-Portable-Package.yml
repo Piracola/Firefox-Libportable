@@ -128,6 +128,11 @@ jobs:
       if: steps.version-check.outputs.should_build == 'true'
       id: build
       run: |
+        New-Item -ItemType Directory -Path libportable -Force | Out-Null
+        Copy-Item builder/upcheck64.exe libportable/upcheck64.exe -Force
+        Copy-Item builder/portable64.dll libportable/portable64.dll -Force
+        if (-not (Test-Path libportable/portable.ini)) { Copy-Item builder/portable.ini libportable/portable.ini -Force }
+        if (-not (Test-Path libportable/injectpe.bat)) { Copy-Item builder/injectpe.bat libportable/injectpe.bat -Force }
         $version = "${{ steps.version-check.outputs.firefox_version }}"
         $url = "https://download-installer.cdn.mozilla.net/pub/firefox/releases/$version/win64/en-US/Firefox%20Setup%20$version.exe"
         python builder/build.py --browser firefox --version "$version" --url "$url" --libportable libportable --launcher 开始.bat
