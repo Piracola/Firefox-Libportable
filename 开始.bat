@@ -17,3 +17,4 @@ if %errorlevel% neq 0 (
     pause & exit /b 1
 )
 
+echo [成功] 快捷方式已创建: %lnk%

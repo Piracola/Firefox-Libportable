@@ -1,187 +1,29 @@
-# GitHub Actions 工作流：浏览器便携版打包
-# 这个工作流支持 Zen 浏览器和 Firefox 浏览器的便携版构建
+# Firefox 便携版构建
+#
+# 实际流程全部在 Browser-builder 的可复用工作流里，这里只负责触发条件和参数。
+# 需要调整构建逻辑时，请改 https://github.com/Piracola/Browser-builder
 name: Firefox Portable Build
 
 on:
   workflow_dispatch:
-    inputs:
-      reason:
-        description: '构建原因'
-        required: false
-        default: '手动触发构建'
-        type: string
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   schedule:
     - cron: '0 0 * * *'
 
+# 定时任务和 push 撞在一起时排队执行，避免两个构建抢同一个 Release 标签。
+concurrency:
+  group: build-firefox
+  cancel-in-progress: false
+
 jobs:
-  build-firefox:
-    runs-on: windows-latest
+  build:
     permissions:
       contents: write
-      packages: write
-
-    steps:
-    # 步骤 1: 检出代码仓库
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    # 步骤 2: 恢复版本缓存
-    - name: Cache version info
-      uses: actions/cache@v4
-      with:
-        path: firefox_last_version.txt
-        key: firefox-version-${{ github.run_number }}
-        restore-keys: |
-          firefox-version-
-
-    # 步骤 3: 检查 Firefox 浏览器版本更新
-    - name: Check Firefox Browser version
-      id: version-check
-      run: |
-        # 获取 Firefox 最新版本信息
-        $latest_url = "https://product-details.mozilla.org/1.0/firefox_versions.json"
-        $trigger_event = "${{ github.event_name }}"
-        $version_file = "firefox_last_version.txt"
-        
-        try {
-          $response = Invoke-RestMethod -Uri $latest_url
-          $latest_version = $response.LATEST_FIREFOX_VERSION
-          echo "firefox_version=$latest_version" >> $env:GITHUB_OUTPUT
-          
-          # 设置默认构建原因
-          $build_reason = ""
-          $should_build = $false
-          
-          # 手动触发和代码提交触发总是执行构建
-          if ($trigger_event -eq "workflow_dispatch") {
-            $build_reason = "手动触发构建"
-            $should_build = $true
-          } elseif ($trigger_event -eq "push") {
-            $build_reason = "代码提交触发"
-            $should_build = $true
-          } else {
-            # 定时触发：检查版本更新
-            if (Test-Path $version_file) {
-              $last_version = Get-Content $version_file
-              if ($last_version -eq $latest_version) {
-                $build_reason = "无需更新"
-                $should_build = $false
-              } else {
-                $build_reason = "自动更新构建"
-                $should_build = $true
-              }
-            } else {
-              $build_reason = "首次构建"
-              $should_build = $true
-            }
-          }
-          
-          # 保存版本信息并输出构建结果
-          if ($should_build) {
-            $latest_version | Out-File -FilePath $version_file -Encoding UTF8
-          }
-          
-          echo "should_build=$should_build" >> $env:GITHUB_OUTPUT
-          echo "build_reason=$build_reason" >> $env:GITHUB_OUTPUT
-          
-        } catch {
-          echo "should_build=true" >> $env:GITHUB_OUTPUT
-          echo "build_reason=错误回退构建" >> $env:GITHUB_OUTPUT
-        }
-
-    # 步骤 4: 准备发布说明
-    - name: Prepare Release Notes
-      if: steps.version-check.outputs.should_build == 'true'
-      run: |
-        $version = "${{ steps.version-check.outputs.firefox_version }}"
-        $bodyFile = "release_body.md"
-        $content = "Firefox $version 便携版`n"
-        $content += "这是一个自动构建的 Firefox 浏览器便携版本，基于 libportable 项目。`n`n"
-        $content += "**官方发行说明 / Official Release Notes:** https://www.mozilla.org/en-US/firefox/$version/releasenotes/`n`n"
-        Set-Content -Path $bodyFile -Value $content -Encoding UTF8
-
-    # 步骤 5: 准备构建环境
-    - name: Checkout Browser-builder
-      if: steps.version-check.outputs.should_build == 'true'
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.repository_owner }}/Browser-builder
-        path: builder
-
-    - name: Set up Python
-      if: steps.version-check.outputs.should_build == 'true'
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    - name: Install dependencies
-      if: steps.version-check.outputs.should_build == 'true'
-      run: |
-        pip install -r builder/requirements.txt
-
-    # 步骤 6: 执行 Python 构建脚本
-    - name: Build Portable Package
-      if: steps.version-check.outputs.should_build == 'true'
-      id: build
-      run: |
-        New-Item -ItemType Directory -Path libportable -Force | Out-Null
-        Copy-Item builder/upcheck64.exe libportable/upcheck64.exe -Force
-        Copy-Item builder/portable64.dll libportable/portable64.dll -Force
-        if (-not (Test-Path libportable/portable.ini)) { Copy-Item builder/portable.ini libportable/portable.ini -Force }
-        if (-not (Test-Path libportable/injectpe.bat)) { Copy-Item builder/injectpe.bat libportable/injectpe.bat -Force }
-        $version = "${{ steps.version-check.outputs.firefox_version }}"
-        $url = "https://download-installer.cdn.mozilla.net/pub/firefox/releases/$version/win64/en-US/Firefox%20Setup%20$version.exe"
-        python builder/build.py --browser firefox --version "$version" --url "$url" --libportable libportable --launcher 开始.bat
-        $artifactPath = "Firefox_$version.7z"
-        echo "artifact_path=$artifactPath" >> $env:GITHUB_OUTPUT
-        echo "artifact_name=$artifactPath" >> $env:GITHUB_OUTPUT
-
-    # 步骤 7: 创建 Release
-    - name: Create Release
-      if: steps.version-check.outputs.should_build == 'true'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.version-check.outputs.firefox_version }}
-        name: Firefox Portable ${{ steps.version-check.outputs.firefox_version }}
-        body_path: release_body.md
-        files: |
-          Firefox_${{ steps.version-check.outputs.firefox_version }}.7z
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # 步骤 8: 提交版本更新
-    - name: Commit version update
-      if: steps.version-check.outputs.should_build == 'true'
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add firefox_last_version.txt
-        git diff --cached --quiet
-        if ($LASTEXITCODE -eq 0) {
-          Write-Host "No version file changes to commit."
-        } elseif ($LASTEXITCODE -eq 1) {
-          git commit -m "Update Firefox version to ${{ steps.version-check.outputs.firefox_version }}"
-          git push
-        } else {
-          exit $LASTEXITCODE
-        }
-
-  cleanup:
-    if: always()
-    needs: build-firefox
-    runs-on: ubuntu-latest
-    permissions:
       actions: write
-      contents: read
-    steps:
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 0
-          keep_minimum_runs: 10
+    uses: Piracola/Browser-builder/.github/workflows/build-portable.yml@main
+    with:
+      browser: firefox
+      # 想发布中文版 Firefox，把这里改成 zh-CN 即可。
+      lang: en-US
+      release-notes-url: 'https://www.mozilla.org/en-US/firefox/{version}/releasenotes/'
